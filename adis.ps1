@@ -12,14 +12,19 @@ else
 
     {
 
+        if ($i -notmatch '.apk$')
+        {
+            $i += ".apk"
+        }
+
         if ($f)
         {
-            apktool.cmd -f d "$i.apk"
+            apktool.cmd -f d "$i"
 
         }
         else
         {
-            apktool.cmd d "$i.apk"
+            apktool.cmd d "$i"
         }
 
     }

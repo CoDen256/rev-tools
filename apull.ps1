@@ -49,10 +49,11 @@ else
 
             $n = $p.split("/")[-1]
             $n = "$name.$n"
-#            adb pull $p "./$n"
+            adb pull $p "./$n"
             Write-Host "Pulled $n"
-#            Out-Host "$n"
+            $n
         }
+        Write-Host "`n"
     }
     else
     {
@@ -60,9 +61,9 @@ else
         if($v){
             Write-Host "Pulling $p"
         }
-#        adb pull $p "./$name.apk"
-        Write-Host "Pulled $name.apk"
-#        Out-Host "$name.apk"
+        adb pull $p "./$name.apk"
+        Write-Host "Pulled $name.apk`n"
+        $name.apk
     }
 }
 
