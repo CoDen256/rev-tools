@@ -2,68 +2,66 @@ param (
     [string]$search = "",
     [switch]$all = $false,
     [switch]$v = $false,
+    [switch]$dry = $false,
     [string]$name = ""
 )
 #Write-Host "$all $search $name"
-if ($search -eq ""){
-    Write-Host "search not specified"
-    exit
-}
-$package=adb shell "pm list packages | grep $search | cut -d':' -f2"
-$package=$package -Split "`r`n"
-if ($package.count -eq 0 )
-{
-    Write-Host "list packages grep '$search' gave nothing "
-    exit
-}
-if ($package.count -gt 1 )
-{
-    Write-Host "grep '$search' gave multiple packages:"
+$package=aget.ps1 $search
 
-    Foreach ($i in $package)
-    {
-        Write-Host "$i"
-    }
+if ($name -eq ""){
+    $name=$package.split(".")[-1]
 }
-else
-{
-    $package=$package[0]
-    if ($name -eq ""){
-        $name=$package.split(".")[-1]
-    }
 
-    Write-Host "$package"
-    Write-Host "$name`n"
-    $paths=adb shell "pm path $package | cut -d':' -f2"
+Write-Host "$package"
+Write-Host "$name`n"
+$paths=adb shell "pm path $package | cut -d':' -f2"
 #    Foreach ($p in $paths)
 #    {
 #        Write-Host "$p"
 #    }
-    if ($all)
+if ($all)
+{
+    Foreach ($p in $paths)
     {
-        Foreach ($p in $paths)
-        {
-            if($v){
-                Write-Host "Pulling $p"
-            }
-
-            $n = $p.split("/")[-1]
-            $n = "$name.$n"
-            adb pull $p "./$n"
-            Write-Host "Pulled $n"
-            $n
-        }
-        Write-Host "`n"
-    }
-    else
-    {
-        $p=$paths[0]
         if($v){
             Write-Host "Pulling $p"
         }
-        adb pull $p "./$name.apk"
-        Write-Host "Pulled $name.apk`n"
-        $name.apk
+
+        $n = $p.split("/")[-1]
+        if ($n -eq "base.apk")
+        {
+            $n = "apk"
+        }
+        $n = "$name.$n"
+
+        if ($dry)
+        {
+        }
+        else
+        {
+            adb pull $p "./$n"
+        }
+        Write-Host "Pulled $n"
+        $n
     }
+    Write-Host "`n"
 }
+else
+{
+    $p=$paths[0]
+    if($v){
+        Write-Host "Pulling $p"
+    }
+    if ($dry)
+    {
+
+    }
+    else
+    {
+        adb pull $p "./$name.apk"
+    }
+    Write-Host "Pulled $name.apk`n"
+    $name.apk
+}
+
 
