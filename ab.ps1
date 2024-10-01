@@ -1,10 +1,6 @@
 $apkfile=$args[0]
-if ($apkfile -eq $null)
-{
-    Write-Host "No args"
-}
-else
-{
-    apktool.cmd b "$apkfile"
-}
+$name = Split-Path $apkfile -leaf
 
+apktool.cmd b "$apkfile" -o "$name.b.apk"
+zipalign.exe -v -p 4 "$name.b.apk" "$name.z.apk"
+apksigner.bat sign -ks C:\Users\denbl\.android\release.keystore --out "$name.r.apk" "$name.z.apk"
