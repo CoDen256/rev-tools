@@ -1,10 +1,11 @@
 param (
     [string]$search = ""
 )
+$ErrorActionPreference = "Stop"
 
 if ($search -eq ""){
     Write-Host "search not specified"
-    exit
+    return
 }
 $package=adb shell "pm list packages | grep $search | cut -d':' -f2"
 $package=$package -Split "`r`n"
@@ -12,7 +13,7 @@ $package=$package -Split "`r`n"
 if ($package.count -eq 0 )
 {
     Write-Host "list packages grep '$search' gave nothing "
-    exit
+    return
 }
 if ($package.count -gt 1 )
 {
@@ -22,6 +23,8 @@ if ($package.count -gt 1 )
     {
         Write-Host "$i"
     }
-    exit
+    return
 }
-$package[0]
+$package=$package[0]
+Write-Host "Found: $package"
+$package

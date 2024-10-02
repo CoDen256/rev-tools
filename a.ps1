@@ -1,17 +1,25 @@
 param (
-    [switch]$f = $false
+    [switch]$p=$false,
+    [switch]$da=$false,
+    [switch]$dc=$false,
+    [switch]$b=$false,
+    [switch]$i=$false,
+
+[switch]$all=$false,
+[switch]$da=$false,
+[switch]$dc=$false,
+[switch]$b=$false,
+[switch]$i=$false
 )
-$search=$args[0]
 
-$pulled=apull.ps1 $search -all
 
-Foreach ($p in $pulled)
+if ($p)
 {
-    if ($f){
-        adis -f $p
-    }
-    else
-    {
-        adis $p
-    }
+    apull.ps1
 }
+# pull
+# dis
+# dec
+
+# build
+# inst

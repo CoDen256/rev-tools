@@ -1,31 +1,24 @@
 param (
-    [string]$search = "",
-    [switch]$all = $false,
-    [switch]$v = $false,
-    [switch]$dry = $false,
-    [string]$name = ""
+[string]$search = "",
+[switch]$all = $false,
+[switch]$v = $false,
+[switch]$dry = $false,
+[string]$name = ""
 )
-#Write-Host "$all $search $name"
-$package=aget.ps1 $search
+
+$r=apath.ps1 $search
+$package=$r[0]
+$paths=$r[1]
 
 if ($name -eq ""){
     $name=$package.split(".")[-1]
 }
 
-Write-Host "$package"
-Write-Host "$name`n"
-$paths=adb shell "pm path $package | cut -d':' -f2"
-#    Foreach ($p in $paths)
-#    {
-#        Write-Host "$p"
-#    }
 if ($all)
 {
     Foreach ($p in $paths)
     {
-        if($v){
-            Write-Host "Pulling $p"
-        }
+        if($v){Write-Host "Pulling $p" }
 
         $n = $p.split("/")[-1]
         if ($n -eq "base.apk")
@@ -34,13 +27,11 @@ if ($all)
         }
         $n = "$name.$n"
 
-        if ($dry)
-        {
-        }
-        else
+        if (!$dry)
         {
             adb pull $p "./$n"
         }
+
         Write-Host "Pulled $n"
         $n
     }
@@ -49,14 +40,8 @@ if ($all)
 else
 {
     $p=$paths[0]
-    if($v){
-        Write-Host "Pulling $p"
-    }
-    if ($dry)
-    {
-
-    }
-    else
+    if($v){Write-Host "Pulling $p" }
+    if (!$dry)
     {
         adb pull $p "./$name.apk"
     }

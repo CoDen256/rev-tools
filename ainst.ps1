@@ -9,6 +9,8 @@ if ($args.Count -eq 0)
 }
 elseif ($args.Count -eq 1  -and !$find)
 {
+    $apkfile=$args[0]
+    Write-Host "Running: adb install -r $apkfile"
     adb install -r $apkfile
 
 }
@@ -27,5 +29,5 @@ else
 
     }
     Write-Host "Running: adb -r install-multiple $apks"
-    adb -r install-multiple $apks
+    adb install-multiple -r $apks
 }
