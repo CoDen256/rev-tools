@@ -22,12 +22,12 @@ else
 
         if (!$old){
 
-            $apks=Get-ChildItem -path . -filter *.apk -file -ErrorAction silentlycontinue -recurse | Where-object {$_ -match $tofind } | Where-object {$_ -match '.r.apk$'}
+            $apks=Get-ChildItem -path . -filter *.apk -file -ErrorAction silentlycontinue -recurse | Where-object {$_ -match $tofind } | Where-object {$_ -match '\.s\.apk$'}
         }else {
-            $apks=Get-ChildItem -path . -filter *.apk -file -ErrorAction silentlycontinue -recurse | Where-object {$_ -match $tofind } | Where-object {$_ -notmatch '.r.apk$|.z.apk$|.b.apk$'}
+            $apks=Get-ChildItem -path . -filter *.apk -file -ErrorAction silentlycontinue -recurse | Where-object {$_ -match $tofind } | Where-object {$_ -notmatch '\.s\.apk$|\.z\.apk$|\.b\.apk$'}
         }
 
     }
-    Write-Host "Running: adb -r install-multiple $apks"
+    Write-Host "Running: adb install-multiple -r $apks"
     adb install-multiple -r $apks
 }
