@@ -9,6 +9,11 @@ param (
 $r=apath.ps1 $search
 $package=$r[0]
 $paths=$r[1]
+if (!($paths -is [array]))
+{
+    $paths=@($paths)
+}
+
 
 if ($name -eq ""){
     $name=$package.split(".")[-1]
@@ -18,6 +23,10 @@ if ($all)
 {
     Foreach ($p in $paths)
     {
+        if ($p -eq ""){
+            Write-Host "path is invalid"
+            continue
+        }
         if($v){Write-Host "Pulling $p" }
 
         $n = $p.split("/")[-1]
