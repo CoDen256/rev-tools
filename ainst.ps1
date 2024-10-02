@@ -3,6 +3,7 @@ param (
     [switch]$old=$false
 )
 
+
 if ($args.Count -eq 0)
 {
     Write-Host "No apks specified"
@@ -10,8 +11,11 @@ if ($args.Count -eq 0)
 elseif ($args.Count -eq 1  -and !$find)
 {
     $apkfile=$args[0]
-    Write-Host "Running: adb install -r $apkfile"
-    adb install -r $apkfile
+    $package=agetapk.ps1 $apkfile
+    Write-Host "Running: adb uninstall $package"
+    adb uninstall $package
+    Write-Host "Running: adb install $apkfile"
+    adb install $apkfile
 
 }
 else
@@ -28,6 +32,12 @@ else
         }
 
     }
-    Write-Host "Running: adb install-multiple -r $apks"
-    adb install-multiple -r $apks
+
+    $apkfile=$apks[0]
+    $package=agetapk.ps1 $apkfile
+    Write-Host "Running: adb uninstall $package"
+    adb uninstall $package
+
+    Write-Host "Running: adb install-multiple $apks"
+    adb install-multiple $apks
 }
