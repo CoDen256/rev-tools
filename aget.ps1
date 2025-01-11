@@ -7,7 +7,7 @@ if ($search -eq ""){
     Write-Host "search not specified"
     return
 }
-$package=adb shell "pm list packages | grep $search | cut -d':' -f2"
+$package=adb shell "pm list packages --user 0 | grep -i $search | cut -d':' -f2"
 $package=$package -Split "`r`n"
 
 if ($package.count -eq 0 )

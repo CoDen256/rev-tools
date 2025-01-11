@@ -1,6 +1,7 @@
 param (
     [switch]$find=$false,
-    [switch]$old=$false
+    [switch]$old=$false,
+    [string]$device = "-e"
 )
 
 
@@ -12,10 +13,10 @@ elseif ($args.Count -eq 1  -and !$find)
 {
     $apkfile=$args[0]
     $package=agetapk.ps1 $apkfile
-    Write-Host "Running: adb uninstall $package"
-    adb uninstall $package
-    Write-Host "Running: adb install $apkfile"
-    adb install $apkfile
+    Write-Host "Running: adb $device uninstall $package"
+    adb $device uninstall $package
+    Write-Host "Running: adb $device install $apkfile"
+    adb $device install $apkfile
 
 }
 else

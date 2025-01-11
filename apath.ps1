@@ -3,7 +3,7 @@ param (
 )
 
 $package=aget.ps1 $search
-$paths=adb shell "pm path $package | cut -d':' -f2"
+$paths=adb shell "pm path $package --user 0 | cut -d':' -f2"
 
 Write-Host "Paths: "
 Foreach ($p in $paths)

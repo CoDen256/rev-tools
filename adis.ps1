@@ -6,6 +6,7 @@ if ($first -eq $null)
 {
     Write-Host "No args"
 }
+
 else
 {
     Foreach ($i in $args)
@@ -19,12 +20,12 @@ else
 
         if ($f)
         {
-            apktool.cmd -f d "$i"
+            apktool.cmd -f d -o $PWD/$i.out $PWD/"$i"
 
         }
         else
         {
-            apktool.cmd d "$i"
+            apktool.cmd d -o $PWD/$i.out $PWD/"$i"
         }
 
     }
