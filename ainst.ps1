@@ -1,9 +1,13 @@
 param (
     [switch]$find=$false,
     [switch]$old=$false,
-    [string]$device = "-e"
+    [switch]$d=$false
 )
 
+$device="-e"
+if ($d){
+    $device="-d"
+}
 
 if ($args.Count -eq 0)
 {
