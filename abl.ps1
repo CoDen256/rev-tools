@@ -17,14 +17,11 @@ zipalign.exe -v -p 4 $PWD/"$name.b.apk" $PWD/"$name.z.apk"
 Write-Host "Signing $name.b.apk"
 $signed = asg.ps1 $PWD/"$name.z.apk"
 
+mv $signed "$name.apk"
 if (!$verbose){
     rm $PWD/"$name.b.apk"
     rm $PWD/"$name.z.apk"
-    mv $signed "$name.apk"
+}
 
-    Write-Output $name.apk
-}
-else
-{
-    Write-Output $signed
-}
+Write-Host "Signed $name.apk"
+Write-Output "$name.apk"

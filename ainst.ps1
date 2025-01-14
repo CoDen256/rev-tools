@@ -16,9 +16,16 @@ if ($args.Count -eq 0)
 elseif ($args.Count -eq 1  -and !$find)
 {
     $apkfile=$args[0]
-    $package=agetapk.ps1 $apkfile
-    Write-Host "Running: adb $device uninstall $package"
-    adb $device uninstall $package
+    $package=aname.ps1 $apkfile
+    $apkSig=(asginfo.ps1 -apk $apkfile 6>$null ).toString().trim()
+    $targetSig=(asginfo.ps1 -package $package 6>$null ).trim()
+
+    Write-Host "`nCurrent Signature: $apkSig`nTarget Signature: $targetSig`n"
+    if ($apkSig -ne $targetSig){
+        Write-Host "Running: adb $device uninstall $package"
+        adb $device uninstall $package
+    }
+
     Write-Host "Running: adb $device install $apkfile"
     adb $device install $apkfile
 
@@ -39,7 +46,7 @@ else
     }
 
     $apkfile=$apks[0]
-    $package=agetapk.ps1 $apkfile
+    $package=aname.ps1 $apkfile
     Write-Host "Running: adb uninstall $package"
     adb uninstall $package
 

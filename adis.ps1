@@ -29,8 +29,6 @@ else
         {
             apktool.cmd d -o "$PWD/$i.out" "$PWD/$i"
         }
-        
-        ainit.ps1 "$PWD/$i.out"
         Write-Output "$PWD/$i.out"
     }
 }

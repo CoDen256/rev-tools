@@ -13,7 +13,7 @@ Write-Host "Running: git init ."
 git init .
 Write-Host "Running: git config core.autocrlf false"
 git config core.autocrlf false
-
+git config feature.manyFiles true
 Write-Host "Running: git add ."
 git add .
 Write-Host "Running: commit -m 'init'"
