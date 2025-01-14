@@ -15,9 +15,9 @@ Write-Host "Running: git config core.autocrlf false"
 git config core.autocrlf false
 git config feature.manyFiles true
 Write-Host "Running: git add ."
-git add .
+git add . 6>$null
 Write-Host "Running: commit -m 'init'"
-git commit -m "init"
+git commit -m "init" 6>$null
 Write-Host "Openning studio and code"
 code .
 studio .
