@@ -1,0 +1,1 @@
+java -jar $HOME/tools/APKEditor-1.4.1.jar $args

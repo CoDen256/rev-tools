@@ -1,6 +1,6 @@
 param (
 [string]$search = "",
-[switch]$all = $false,
+[switch]$all = $true,
 [switch]$v = $false,
 [switch]$dry = $false,
 [string]$name = ""
@@ -32,7 +32,7 @@ if ($all)
         $n = $p.split("/")[-1]
         if ($n -eq "base.apk")
         {
-            $n = "apk"
+            $n = "base.apk"
         }
         $n = "$name.$n"
 
@@ -42,9 +42,10 @@ if ($all)
         }
 
         Write-Host "Pulled $n"
-        $n
     }
-    Write-Host "`n"
+    Write-Host "Merging to $PWD/$name.merged.apk"
+    Write-Output "$name.merged.apk"
+    aedit.ps1 m -i ./ -o "$PWD/$name.merged.apk"
 }
 else
 {
@@ -52,10 +53,9 @@ else
     if($v){Write-Host "Pulling $p" }
     if (!$dry)
     {
-        adb pull $p "./$name.apk"
+        adb pull $p "./$name.base.apk"
     }
     Write-Host "Pulled $name.apk`n"
-    $name.apk
+    $name.base.apk
+    Write-Output "$name.base.apk"
 }
-
-

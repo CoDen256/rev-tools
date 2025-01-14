@@ -13,20 +13,24 @@ else
 
     {
 
+
         if ($i -notmatch '.apk$')
         {
             $i += ".apk"
         }
 
+        Write-Host "Dissasembling $PWD/$i to $PWD/$i.out"
+
         if ($f)
         {
-            apktool.cmd -f d -o $PWD/$i.out $PWD/"$i"
-
+            apktool.cmd -f d -o "$PWD/$i.out" "$PWD/$i"
         }
         else
         {
-            apktool.cmd d -o $PWD/$i.out $PWD/"$i"
+            apktool.cmd d -o "$PWD/$i.out" "$PWD/$i"
         }
-
+        
+        ainit.ps1 "$PWD/$i.out"
+        Write-Output "$PWD/$i.out"
     }
 }
