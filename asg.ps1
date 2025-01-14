@@ -37,7 +37,7 @@ Foreach ($name in $args)
     $outname += ".s.apk"
     #Write-Host "final $outname"
     Write-Host "Running: apksigner.bat sign --out $outname $name"
-    apksigner.bat sign --ks-pass pass:123456 --ks C:\Users\denbl\.android\release.keystore --out "$outname" "$name"
+    apksigner.bat sign --ks-pass pass:123456 --ks C:\Users\denbl\.android\release.keystore --out "$outname" "$name" | Write-Host
     rm "$outname.idsig"
     $outname
 }

@@ -44,9 +44,9 @@ if ($all)
         Write-Host "Pulled $n"
     }
     if ($paths.Count -gt 1){
-        Write-Host "Merging to $PWD/$name.merged.apk"
-        Write-Output "$name.merged.apk"
-        aedit.ps1 m -i ./ -o "$PWD/$name.merged.apk"
+        Write-Host "Merging to $PWD/$name.m.apk"
+        Write-Output "$name.m.apk"
+        aedit.ps1 m -i ./ -o "$PWD/$name.m.apk"
     }
     else
     {
