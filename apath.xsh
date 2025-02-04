@@ -1,5 +1,7 @@
 #!/usr/bin/env xonsh
 
+import sys, os; sys.path.append(os.path.join(os.path.dirname(__file__)))
+
 from aget import aget, noop
 
 def apath(args, stdin=noop, log=noop):
