@@ -1,11 +1,12 @@
 #!/usr/bin/env xonsh
 
 import sys, os; sys.path.append(os.path.join(os.path.dirname(__file__)))
+from common import *
 
-from aget import aget, noop
+from aget import aget
 
 def apath(args, stdin=noop, log=noop):
-  code, res = aget($ARGS, log=log)
+  code, res = aget(args, log=log)
   if (code): return (code, res)
 
   paths=$(adb shell pm path @(res) --user 0 | cut -d: -f2).strip().split("\n")
@@ -19,5 +20,4 @@ def apath(args, stdin=noop, log=noop):
   return 0, paths
 
 if __name__ == '__main__':
-  (code, result) = apath($ARGS, log=print)
-  exit(code)
+  run($ARGS, apath)

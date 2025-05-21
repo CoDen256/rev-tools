@@ -1,6 +1,7 @@
 #!/usr/bin/env xonsh
 
-noop = lambda *args: None
+import sys, os; sys.path.append(os.path.join(os.path.dirname(__file__))) 
+from common import *
 
 def aget(args, stdin=noop, log=noop):
   if (len(args) != 2):
@@ -26,5 +27,4 @@ def aget(args, stdin=noop, log=noop):
     return 0, p
 
 if __name__ == '__main__':
-  (code, result) = aget($ARGS, log=print)
-  exit(code)
+  run($ARGS, aget)
