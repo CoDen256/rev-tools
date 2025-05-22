@@ -72,10 +72,9 @@ def apull(pattern, all, dry, name, merge):
     for path in target:
         logging.debug(f"Pulling{' ' if all and len(paths) > 1 else ' single '}{blue(path)}")
 
-        classifier = path.split("/")[-1]
-        if classifier != "base.apk": classifier = f"{name}.{classifier}"
-        else: classifier = name + ".apk"
+        classifier = f"{name}."+path.split("/")[-1]
 
+        if len(paths) == 1: classifier = classifier.replace("base.", "")
         if not dry: !(adb pull @(path) @(f"./{classifier}"))
 
         logging.info(f"Pulled {blue(classifier)}")
