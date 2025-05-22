@@ -17,6 +17,10 @@ END = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
+blue = lambda x: f"{BLUE}{x}{END}"
+bold = lambda x: f"{BOLD}{x}{END}"
+red = lambda x: f"{RED}{x}{END}"
+
 def check_adb():
     if not !(adb shell id):
         adb kill-server
@@ -31,13 +35,13 @@ def aget(pattern):
     packages=list(filter(lambda x: x, packages))
 
     if not packages:
-        raise ValueError(f"Getting no packages for: {BOLD}'{pattern}'")
+        raise ValueError(f"Getting no packages for: '{bold(pattern)}'")
     elif len(packages) > 1:
-        logging.info(f"Getting package {BLUE}'{pattern}'{END}: gave multiple packages:")
+        logging.info(f"Getting multiple packages for '{blue(pattern)}':")
         for p in packages:
             logging.info(p)
     else:
-        logging.info(f"Found package: {BLUE}{BOLD}{packages[0]}{END}")
+        logging.info(f"Found package: {blue(bold(packages[0]))}")
     return packages
 
 def apath(pattern):
@@ -46,86 +50,50 @@ def apath(pattern):
 
     paths=$(adb shell pm path @(res[0]) --user 0 | cut -d: -f2).strip().split("\n")
     paths=list(filter(lambda x: x, paths))
-    if not paths: raise ValueError(f"No paths were found?? for {BOLD}{res[0]}")
+    if not paths: raise ValueError(f"No paths were found?? for {bold(res[0])}")
 
     logging.info("Found paths:")
-    for p in paths: logging.info(BLUE+p+END)
-    return paths
+    for p in paths: logging.info(blue(p))
+    return paths, res[0]
 
 
 def aedit(args):
     apk-editor @(args)
 
-def apull(
-        search: str = "",
-        all: bool = True,
-        v: bool = False,
-        dry: bool = False,
-        name: str = "",
-):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("search", nargs="?", default="")
-    parser.add_argument("--all", action="store_true", default=True)
-    parser.add_argument("--no-all", dest="all", action="store_false")
-    parser.add_argument("-v", action="store_true")
-    parser.add_argument("--dry", action="store_true")
-    parser.add_argument("--name", default="")
+def apull(pattern, all, dry, name, merge):
+    paths, package = apath(pattern)
+    print()
 
-    # _, package = aget(search)
-    # _, paths = apath(search)
-    #
-    # if not paths:
-    #     echo "No paths found"
-    #     return
-    #
-    # if not name:
-    #     name = package.split(".")[-1]
-    #
-    # if all:
-    #     pulled_files = []
-    #     for p in paths:
-    #         if not p:
-    #             echo "path is invalid"
-    #             continue
-    #
-    #         if v:
-    #             echo f"Pulling {p}"
-    #
-    #         n = p.split("/")[-1]
-    #         if n == "base.apk":
-    #             n = "base.apk"
-    #         else:
-    #             n = f"{name}.{n}"
-    #
-    #         if not dry:
-    #             !adb pull @(p) @(f"./{n}")
-    #
-    #         echo f"Pulled {n}"
-    #         pulled_files.append(n)
-    #
-    #     if len(paths) > 1:
-    #         merged_name = f"{name}.m.apk"
-    #         echo f"Merging to {merged_name}"
-    #         !aedit.ps1 m -i ./ -o @(merged_name)
-    #         echo merged_name
-    #     else:
-    #         echo pulled_files[0]
-    # else:
-    #     p = paths[0]
-    #     if v:
-    #         echo f"Pulling {p}"
-    #
-    #     output_name = f"{name}.base.apk"
-    #     if not dry:
-    #         !adb pull @(p) @(f"./{output_name}")
-    #
-    #     echo f"Pulled {output_name}"
-    #     echo output_name
+    if not name: name = package.split(".")[-1]
+    logging.debug(f"Target name is: '{blue(name)}'")
+
+    pulled_files = []
+    target = paths if all else paths[:1]
+    for path in target:
+        logging.debug(f"Pulling{' ' if all and len(paths) > 1 else ' single '}{blue(path)}")
+
+        classifier = path.split("/")[-1]
+        if classifier != "base.apk": classifier = f"{name}.{classifier}"
+        else: classifier = name + ".apk"
+
+        if not dry: !(adb pull @(path) @(f"./{classifier}"))
+
+        logging.info(f"Pulled {blue(classifier)}")
+        pulled_files.append(classifier)
+
+    if len(paths) > 1 and merge and all:
+        merged_name = f"{name}.m.apk"
+        logging.info(f"Merging to {merged_name}")
+        if not dry: aedit(["m", "-i", "./", "-o", merged_name])
+        pulled_files = [merged_name]
+
+    return pulled_files, paths, package
 
 
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
+    parser.add_argument("-o", "--only-output", action='store_true', default=False)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # get
@@ -136,32 +104,55 @@ def _create_parser():
     c = subparsers.add_parser('path', help='Find paths of a single apk by name.')
     c.add_argument('package_pattern')
 
+    # pull
+    c = subparsers.add_parser('pull', help='Pull paths of a single apk by name.')
+    c.add_argument("package_pattern")
+    c.add_argument("--all", action="store_true", default=True)
+    c.add_argument("--single", dest="all", action="store_false")
+    c.add_argument("--dry", action="store_true", default=False)
+    c.add_argument("-m", "--merge", action="store_true", default=False)
+    c.add_argument("--name", default="")
+
     # edit
     c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
 
     return parser
 
 
-def run(cmd, unknown, args):
+def run(cmd, args, rest):
     if cmd == "get":
         return aget(args.package_pattern)
     if cmd == "path":
         return apath(args.package_pattern)
     if cmd == "edit":
-        return aedit($ARGS[2:])
+        return aedit(rest)
+    if cmd == "pull":
+        return apull(args.package_pattern, args.all, args.dry, args.name, args.merge)
+
+def print_result(result):
+    if isinstance(result, list):
+        for i in result:
+            print_result(i)
+        return
+    if isinstance(result, tuple):
+        print_result(result[0])
+        return
+    else:
+        print(result)
+        return
 
 def main():
-    log = print
     parser = _create_parser()
-    args,unknown = parser.parse_known_args()
+    args, rest = parser.parse_known_args()
 
-    level = logging.DEBUG if args.verbose else logging.INFO
+    level = logging.DEBUG if args.verbose else (logging.ERROR if args.only_output else logging.INFO)
     logging.basicConfig(level=level,stream=sys.stdout, format="%(message)s")
 
     try:
-        result = run(args.command, args, unknown)
-        logging.debug(result)
+        result = run(args.command, args, rest)
+        if args.only_output: print_result(result)
+        else: logging.debug(result)
     except Exception as e:
-        logging.error(RED+str(e)+END)
+        logging.error(red(str(e)))
         sys.exit(1)
 if __name__ == '__main__': main()
