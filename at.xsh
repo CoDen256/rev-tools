@@ -53,7 +53,7 @@ def apath(pattern):
     return paths
 
 
-def aedit(args, stdin=noop, log=noop):
+def aedit(args):
     apk-editor @(args)
 
 def apull(
@@ -136,32 +136,30 @@ def _create_parser():
     c = subparsers.add_parser('path', help='Find paths of a single apk by name.')
     c.add_argument('package_pattern')
 
-    # pull
-    c = subparsers.add_parser('pull', help='Pull a single apk by name and merge it.')
-    c.add_argument('search', nargs='?', default="")
-    c.add_argument('--all', action='store_true', default=True)
-    c.add_argument('--no-all', dest='all', action='store_false')
-    c.add_argument('-v', action='store_true')
+    # edit
+    c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
 
     return parser
 
 
-def run(cmd, args):
+def run(cmd, unknown, args):
     if cmd == "get":
         return aget(args.package_pattern)
     if cmd == "path":
         return apath(args.package_pattern)
+    if cmd == "edit":
+        return aedit($ARGS[2:])
 
 def main():
     log = print
     parser = _create_parser()
-    args = parser.parse_args()
+    args,unknown = parser.parse_known_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level,stream=sys.stdout, format="%(message)s")
 
     try:
-        result = run(args.command, args)
+        result = run(args.command, args, unknown)
         logging.debug(result)
     except Exception as e:
         logging.error(RED+str(e)+END)
