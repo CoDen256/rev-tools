@@ -3,6 +3,7 @@
 import sys, os;sys.path.append(os.path.join(os.path.dirname(__file__)))
 import argparse, logging
 from pathlib import Path
+import re
 
 noop = lambda *args: None
 
@@ -21,6 +22,7 @@ UNDERLINE = '\033[4m'
 blue = lambda x: f"{BLUE}{x}{END}"
 bold = lambda x: f"{BOLD}{x}{END}"
 red = lambda x: f"{RED}{x}{END}"
+yellow = lambda x: f"{YELLOW}{x}{END}"
 
 def check_adb():
     if not !(adb shell id):
@@ -72,27 +74,27 @@ def amerge(src, dest_dir, name=""):
     aedit(["m", "-i", src, "-o", dest])
     return dest
 
-def apull(pattern, all, dry, name, merge, dir):
+def apull(pattern, all, dry, name, merge, dir, index=0):
     paths, package = apath(pattern)
 
     if not name: name = package.split(".")[-1]
     dir = os.path.abspath(dir)
-    logging.info(f"\nPulling {package}")
+    single = not all or len(paths) == 1
+    logging.info(f"\nPulling{' ' if not single else ' single('+str(index)+'th) apk of '}{package}")
     logging.debug(f"Target name is: '{blue(name)}'")
     logging.debug(f"Target directory is: '{blue(dir)}'")
 
     Path(dir).mkdir(parents=True, exist_ok=True)
 
-    single = not all or len(paths) == 0
     pulled_files = []
-    topull = paths if not single else paths[:1]
+    topull = paths if not single else [paths[index]]
     for path in topull:
         logging.debug(f"Pulling{' ' if not single else ' single '}{blue(path)}")
 
         classifier = f"{name}."+path.split("/")[-1]
+        if single: classifier = classifier.replace("base.", "")
         target = os.path.join(dir, classifier)
 
-        if single: classifier = classifier.replace("base.", "")
         if not dry: !(adb pull @(path) @(target)).rtn # read return code, to force sync execution
 
         logging.info(f"Pulled to {blue(target)}")
@@ -104,6 +106,40 @@ def apull(pattern, all, dry, name, merge, dir):
 
     return pulled_files, paths, package
 
+def asha_apk(apk):
+    logging.info(f"Getting signature for: {blue(apk)}")
+    apksigner_output = $(apksigner verify --print-certs @(apk)).splitlines()
+    logging.info("\n".join(apksigner_output))
+
+    sha256_match = re.search(r"SHA-256 digest:\s*([a-f0-9]+)", "\n".join(apksigner_output))
+    sha256 = sha256_match.group(1) if sha256_match else ""
+    logging.info(f"Found sha256: {sha256}")
+
+    formatted_sha256 = ":".join([sha256[i:i+2] for i in range(0, len(sha256), 2)]).upper()
+    return formatted_sha256
+
+def asha_package(pattern):
+    res = aget(pattern)
+    if len(res) > 1: raise ValueError(f"Returned multiple packages, expected one")
+    package = res[0]
+    logging.info(f"\nGetting signature for: {blue(package)}")
+    signature = $(adb shell dumpsys package @(package) | grep Signatures | sed 's/.*\\[//;s/\\].*//').strip()
+    if not signature:
+        logging.warning(yellow(f"Cannot get the signature of the installed package, let's try downloading and getting signature via apk"))
+        # sucks lets try to download apk and get the second part
+        target, _, _ = apull(pattern, False, False,  "temp", False, "/tmp", -1) # get last that is smaller
+        logging.info()
+        signature = asha_apk(target[0])
+        rm @(target)
+
+    return signature
+
+def asha(pattern, apk):
+    if pattern: signature = asha_package(pattern)
+    else: signature = asha_apk(apk)
+
+    logging.info(f"Found signature: {blue(signature)}")
+    return signature
 
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
@@ -135,6 +171,11 @@ def _create_parser():
     c.add_argument('dest', default="./")
     c.add_argument("-n", '--name', default="")
 
+    c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
+    group = c.add_mutually_exclusive_group(required=True)
+    group.add_argument('-p', "--package", default="")
+    group.add_argument("-a", "--apk", default="")
+
     # edit
     c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
 
@@ -150,6 +191,8 @@ def run(cmd, args, rest):
         return aedit(rest)
     if cmd == "pull":
         return apull(args.package_pattern, args.all, args.dry, args.name, args.merge, args.dir)
+    if cmd == "sha":
+        return asha(args.package, args.apk)
     if cmd == "merge":
         return amerge(args.src, args.dest, args.name)
 
