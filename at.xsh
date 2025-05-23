@@ -1,6 +1,6 @@
 #!/usr/bin/env xonsh
 
-import sys, os; sys.path.append(os.path.join(os.path.dirname(__file__)))
+import sys, os;sys.path.append(os.path.join(os.path.dirname(__file__)))
 import argparse, logging
 from pathlib import Path
 
@@ -61,6 +61,17 @@ def apath(pattern):
 def aedit(args):
     apk-editor @(args)
 
+def amerge(src, dest_dir, name=""):
+    src = os.path.abspath(src)
+    Path(dest_dir).mkdir(parents=True, exist_ok=True)
+
+    if not name: name = "merged.apk"
+    dest = os.path.abspath(os.path.join(dest_dir, name))
+    logging.info(f"Merging {blue(src)} to {blue(dest)}")
+
+    aedit(["m", "-i", src, "-o", dest])
+    return dest
+
 def apull(pattern, all, dry, name, merge, dir):
     paths, package = apath(pattern)
 
@@ -82,16 +93,14 @@ def apull(pattern, all, dry, name, merge, dir):
         target = os.path.join(dir, classifier)
 
         if single: classifier = classifier.replace("base.", "")
-        if not dry: !(adb pull @(path) @(target))
+        if not dry: !(adb pull @(path) @(target)).rtn # read return code, to force sync execution
 
         logging.info(f"Pulled to {blue(target)}")
         pulled_files.append(target)
 
     if len(paths) > 1 and merge and all:
-        merged_name = os.path.join(dir, f"{name}.merged.apk")
-        logging.info(f"Merging to {merged_name}")
-        if not dry: aedit(["m", "-i", dir, "-o", merged_name])
-        pulled_files = [merged_name]
+        logging.info("")
+        return [amerge(dir, dir, f"{name}.merged.apk")], paths, package
 
     return pulled_files, paths, package
 
@@ -120,6 +129,12 @@ def _create_parser():
     c.add_argument("-n", "--name", default="")
     c.add_argument("-d", "--dir", default="./")
 
+    # merge
+    c = subparsers.add_parser('merge', help='Merge a folder containing apks to a single apk by apk-editor.')
+    c.add_argument('src', default="./")
+    c.add_argument('dest', default="./")
+    c.add_argument("-n", '--name', default="")
+
     # edit
     c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
 
@@ -135,6 +150,8 @@ def run(cmd, args, rest):
         return aedit(rest)
     if cmd == "pull":
         return apull(args.package_pattern, args.all, args.dry, args.name, args.merge, args.dir)
+    if cmd == "merge":
+        return amerge(args.src, args.dest, args.name)
 
 def print_result(result):
     if isinstance(result, list):
