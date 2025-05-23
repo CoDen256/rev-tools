@@ -2,6 +2,7 @@
 
 import sys, os; sys.path.append(os.path.join(os.path.dirname(__file__)))
 import argparse, logging
+from pathlib import Path
 
 noop = lambda *args: None
 
@@ -60,30 +61,36 @@ def apath(pattern):
 def aedit(args):
     apk-editor @(args)
 
-def apull(pattern, all, dry, name, merge):
+def apull(pattern, all, dry, name, merge, dir):
     paths, package = apath(pattern)
-    print()
 
     if not name: name = package.split(".")[-1]
+    dir = os.path.abspath(dir)
+    logging.info(f"\nPulling {package}")
     logging.debug(f"Target name is: '{blue(name)}'")
+    logging.debug(f"Target directory is: '{blue(dir)}'")
 
+    Path(dir).mkdir(parents=True, exist_ok=True)
+
+    single = not all or len(paths) == 0
     pulled_files = []
-    target = paths if all else paths[:1]
-    for path in target:
-        logging.debug(f"Pulling{' ' if all and len(paths) > 1 else ' single '}{blue(path)}")
+    topull = paths if not single else paths[:1]
+    for path in topull:
+        logging.debug(f"Pulling{' ' if not single else ' single '}{blue(path)}")
 
         classifier = f"{name}."+path.split("/")[-1]
+        target = os.path.join(dir, classifier)
 
-        if len(paths) == 1: classifier = classifier.replace("base.", "")
-        if not dry: !(adb pull @(path) @(f"./{classifier}"))
+        if single: classifier = classifier.replace("base.", "")
+        if not dry: !(adb pull @(path) @(target))
 
-        logging.info(f"Pulled {blue(classifier)}")
-        pulled_files.append(classifier)
+        logging.info(f"Pulled to {blue(target)}")
+        pulled_files.append(target)
 
     if len(paths) > 1 and merge and all:
-        merged_name = f"{name}.m.apk"
+        merged_name = os.path.join(dir, f"{name}.merged.apk")
         logging.info(f"Merging to {merged_name}")
-        if not dry: aedit(["m", "-i", "./", "-o", merged_name])
+        if not dry: aedit(["m", "-i", dir, "-o", merged_name])
         pulled_files = [merged_name]
 
     return pulled_files, paths, package
@@ -106,11 +113,12 @@ def _create_parser():
     # pull
     c = subparsers.add_parser('pull', help='Pull paths of a single apk by name.')
     c.add_argument("package_pattern")
-    c.add_argument("--all", action="store_true", default=True)
-    c.add_argument("--single", dest="all", action="store_false")
+    c.add_argument("-a","--all", action="store_true", default=True)
+    c.add_argument("-s", "--single", dest="all", action="store_false")
     c.add_argument("--dry", action="store_true", default=False)
     c.add_argument("-m", "--merge", action="store_true", default=False)
-    c.add_argument("--name", default="")
+    c.add_argument("-n", "--name", default="")
+    c.add_argument("-d", "--dir", default="./")
 
     # edit
     c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
@@ -126,7 +134,7 @@ def run(cmd, args, rest):
     if cmd == "edit":
         return aedit(rest)
     if cmd == "pull":
-        return apull(args.package_pattern, args.all, args.dry, args.name, args.merge)
+        return apull(args.package_pattern, args.all, args.dry, args.name, args.merge, args.dir)
 
 def print_result(result):
     if isinstance(result, list):
@@ -150,7 +158,7 @@ def main():
     try:
         result = run(args.command, args, rest)
         if args.only_output: print_result(result)
-        else: logging.debug(result)
+        else: logging.debug(f"\n{blue('Result:')}\n{result}")
     except Exception as e:
         logging.error(red(str(e)))
         sys.exit(1)
