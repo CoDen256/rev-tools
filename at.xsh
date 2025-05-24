@@ -202,6 +202,8 @@ def adis(apks, force):
     return dised
 
 def abl(src, verbose, force, keystore, env, assemble, align, sign, clean):
+    if not any([assemble, align, sign]):
+        assemble = align = sign = True
     src = Path(src).resolve()
     dir, name = src.parent, str(src.name).replace("smali.", "").replace(".apk", "")+".apk"
     force_flag = "-f " if force else ""
@@ -236,7 +238,9 @@ def abl(src, verbose, force, keystore, env, assemble, align, sign, clean):
         target_signed = fixed
 
     # Cleanup
+    logging.info(f"Out: {blue(target_signed)}")
     if clean:
+        logging.debug("Cleaning up...")
         if target_build != target_signed: target_build.unlink(missing_ok=True)
         if target_aligned != target_signed: target_aligned.unlink(missing_ok=True)
 
