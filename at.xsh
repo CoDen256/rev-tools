@@ -175,7 +175,7 @@ def adec(apks):
     for apk in apks:
         path = Path(apk).resolve()
 
-        output_dir = (path.parent / ('decompiled.' + path.stem)).resolve()
+        output_dir = (path.parent / ('java.' + path.stem)).resolve()
         logging.info(f"Decompiling {path} to {blue(output_dir)}")
 
         if not ![jadx -d @(output_dir) @(path)]:
@@ -183,6 +183,26 @@ def adec(apks):
 
         decompiled.append(str(output_dir))
     return decompiled
+
+def adis(apks, force):
+    dised = []
+    for apk in apks:
+        # Ensure .apk extension
+        path = Path(apk).resolve()
+
+        # Remove .apk extension for output dir
+        output_dir = (path.parent / ('smali.' + path.stem)).resolve()
+        logging.info(f"Disassembling {path} to {blue(output_dir)}")
+
+        cmd = f"d{' -f' if force else ''} -o {output_dir} {path}"
+        logging.debug(f"Running: apktool {cmd}")
+
+        if not ![apktool @(cmd.split())]:
+            raise ValueError(f"Unable to disassemble: {path}")
+
+        dised.append(str(output_dir))
+    return dised
+
 
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
@@ -219,8 +239,14 @@ def _create_parser():
     c.add_argument( 'dest', default="./")
     c.add_argument("-n", '--name', default="")
 
+    # decompile
     c = subparsers.add_parser('dec', help='Decompile arbitrary amount of apk files')
     c.add_argument("apks", metavar='N', nargs="*")
+
+    # disassemble
+    c = subparsers.add_parser('dis', help='Disassemble arbitrary amount of apk files')
+    c.add_argument("apks", metavar='N', nargs="*")
+    c.add_argument("-f", "--force", action='store_true', default=False)
 
     # sha
     c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
@@ -241,6 +267,7 @@ def _create_parser():
 
 
 def run(cmd, args, rest):
+    # print(args)
     if cmd == "name":
         return aname(args.apk_file)
     if cmd == "get":
@@ -257,6 +284,8 @@ def run(cmd, args, rest):
         return amerge(args.src, args.dest, args.name)
     if cmd == "dec":
         return adec(args.apks)
+    if cmd == "dis":
+        return adis(args.apks, args.force)
     if cmd == "sign":
         return asign(args.apks, args.ks, args.env)
 
