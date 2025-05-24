@@ -74,7 +74,7 @@ def amerge(src, dest_dir, name=""):
     aedit(["m", "-i", src, "-o", dest])
     return dest
 
-def apull(pattern, all, dry, name, merge, dir, index=0):
+def apull(pattern, all, dry, name, merge, dir, index):
     paths, package = apath(pattern)
 
     if not name: name = package.split(".")[-1]
@@ -128,7 +128,7 @@ def asha_package(pattern):
         logging.warning(yellow(f"Cannot get the signature of the installed package, let's try downloading and getting signature via apk"))
         # sucks lets try to download apk and get the second part
         target, _, _ = apull(pattern, False, False,  "temp", False, "/tmp", -1) # get last that is smaller
-        logging.info()
+        logging.info("")
         signature = asha_apk(target[0])
         rm @(target)
 
@@ -164,6 +164,7 @@ def _create_parser():
     c.add_argument("-m", "--merge", action="store_true", default=False)
     c.add_argument("-n", "--name", default="")
     c.add_argument("-d", "--dir", default="./")
+    c.add_argument("-i", "--index", type=int, default=0)
 
     # merge
     c = subparsers.add_parser('merge', help='Merge a folder containing apks to a single apk by apk-editor.')
@@ -190,7 +191,7 @@ def run(cmd, args, rest):
     if cmd == "edit":
         return aedit(rest)
     if cmd == "pull":
-        return apull(args.package_pattern, args.all, args.dry, args.name, args.merge, args.dir)
+        return apull(args.package_pattern, args.all, args.dry, args.name, args.merge, args.dir, args.index)
     if cmd == "sha":
         return asha(args.package, args.apk)
     if cmd == "merge":
