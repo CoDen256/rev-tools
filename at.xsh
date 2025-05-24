@@ -152,10 +152,9 @@ def asha(pattern, apk):
 def asign(apks, keystore, env):
     out = []
     for name in apks:
-        path = os.path.abspath(name)
+        path = Path(name).resolve()
 
-        orig = Path(str(path))
-        result_apk = str(orig.parent / ("signed."+ orig.name))
+        result_apk = str(path.parent / ("signed."+ path.name))
 
         cmd = f"sign --ks-pass env:{env} --ks {keystore} --out {result_apk} {path}"
         logging.debug(f"Running: apksigner {cmd}")
@@ -170,6 +169,20 @@ def asign(apks, keystore, env):
         logging.info(f"Signed: {blue(result_apk)}")
         out.append(result_apk)
     return out
+
+def adec(apks):
+    decompiled = []
+    for apk in apks:
+        path = Path(apk).resolve()
+
+        output_dir = (path.parent / ('decompiled.' + path.stem)).resolve()
+        logging.info(f"Decompiling {path} to {blue(output_dir)}")
+
+        if not ![jadx -d @(output_dir) @(path)]:
+            raise ValueError(f"Unable to decompile: {path}")
+
+        decompiled.append(str(output_dir))
+    return decompiled
 
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
@@ -202,9 +215,12 @@ def _create_parser():
 
     # merge
     c = subparsers.add_parser('merge', help='Merge a folder containing apks to a single apk by apk-editor.')
-    c.add_argument('src', default="./")
-    c.add_argument('dest', default="./")
+    c.add_argument( 'src', default="./")
+    c.add_argument( 'dest', default="./")
     c.add_argument("-n", '--name', default="")
+
+    c = subparsers.add_parser('dec', help='Decompile arbitrary amount of apk files')
+    c.add_argument("apks", metavar='N', nargs="*")
 
     # sha
     c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
@@ -213,7 +229,7 @@ def _create_parser():
     group.add_argument("-a", "--apk", default="")
 
     # sign
-    c = subparsers.add_parser('sign', help='Get fingerprint of the package by name or the apk path')
+    c = subparsers.add_parser('sign', help='Sign an apk using keystore')
     c.add_argument('apks', metavar='N', nargs='*')
     c.add_argument("-k", '--ks', default="{HOME}/.android/debug.keystore".format(HOME=$HOME))
     c.add_argument("-e", '--env', default=f"ANDROID_DEBUG_KEYSTORE_PASS")
@@ -239,6 +255,8 @@ def run(cmd, args, rest):
         return asha(args.package, args.apk)
     if cmd == "merge":
         return amerge(args.src, args.dest, args.name)
+    if cmd == "dec":
+        return adec(args.apks)
     if cmd == "sign":
         return asign(args.apks, args.ks, args.env)
 
