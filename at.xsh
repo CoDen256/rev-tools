@@ -1,6 +1,4 @@
 #!/usr/bin/env xonsh
-
-from signal import valid_signals
 import sys, os;sys.path.append(os.path.join(os.path.dirname(__file__)))
 import argparse, logging
 from pathlib import Path
@@ -203,6 +201,46 @@ def adis(apks, force):
         dised.append(str(output_dir))
     return dised
 
+def abl(src, verbose, force, keystore, env, assemble, align, sign, clean):
+    src = Path(src).resolve()
+    dir, name = src.parent, str(src.name).replace("smali.", "").replace(".apk", "")+".apk"
+    force_flag = "-f " if force else ""
+
+    target_build = src
+    if assemble:
+        target_build = Path(dir.joinpath("ass."+name))
+        logging.info(f"Assembling {src} to {blue(target_build)}")
+        cmd = f"b --use-aapt2 {force_flag}{src} -o {target_build}"
+        logging.debug(f"Running: apktool {cmd}")
+        if not ![apktool @(cmd.split())]:
+            raise ValueError(f"Unable to assemble {src}")
+
+    # Zipalign
+    target_aligned = target_build
+    if align:
+        target_aligned = Path(dir.joinpath("aligned."+name))
+        logging.info(f"Zip aligning {target_build} to {blue(target_aligned)}")
+        verbose_flag = "-v " if verbose else ""
+        cmd = f"{verbose_flag}{force_flag}-p 4 {target_build} {target_aligned}"
+        logging.debug(f"Running: zipalign {cmd}")
+        if not ![zipalign @(cmd.split())]:
+            raise ValueError(f"Unable to zipalign {target_build}")
+
+
+    # Sign
+    target_signed = target_aligned
+    if sign:
+        target_signed = asign([target_aligned], keystore, env)[0]
+        fixed = target_signed.replace("aligned.", "")
+        mv @(target_signed) @(fixed)
+        target_signed = fixed
+
+    # Cleanup
+    if clean:
+        if target_build != target_signed: target_build.unlink(missing_ok=True)
+        if target_aligned != target_signed: target_aligned.unlink(missing_ok=True)
+
+    return target_signed
 
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
@@ -248,6 +286,17 @@ def _create_parser():
     c.add_argument("apks", metavar='N', nargs="*")
     c.add_argument("-f", "--force", action='store_true', default=False)
 
+    # build
+    c = subparsers.add_parser('bl', help='Build/align/sign an apk')
+    c.add_argument("src", help="Either the apk or the smali sources")
+    c.add_argument("-k", '--ks', default="{HOME}/.android/debug.keystore".format(HOME=$HOME))
+    c.add_argument("-e", '--env', default=f"ANDROID_DEBUG_KEYSTORE_PASS")
+    c.add_argument("-a", "--ass", action='store_true', default=False)
+    c.add_argument("-z", "--zipalign", action='store_true', default=False)
+    c.add_argument("-s", "--sign", action='store_true', default=False)
+    c.add_argument("-c", "--clean", action='store_true', default=False)
+    c.add_argument("-f", "--force", action='store_true', default=False)
+
     # sha
     c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
     group = c.add_mutually_exclusive_group(required=True)
@@ -286,6 +335,8 @@ def run(cmd, args, rest):
         return adec(args.apks)
     if cmd == "dis":
         return adis(args.apks, args.force)
+    if cmd == "bl":
+        return abl(args.src, args.verbose, args.force, args.ks, args.env, args.ass, args.zipalign, args.sign, args.clean)
     if cmd == "sign":
         return asign(args.apks, args.ks, args.env)
 
