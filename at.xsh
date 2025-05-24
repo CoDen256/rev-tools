@@ -1,5 +1,6 @@
 #!/usr/bin/env xonsh
 
+from signal import valid_signals
 import sys, os;sys.path.append(os.path.join(os.path.dirname(__file__)))
 import argparse, logging
 from pathlib import Path
@@ -28,9 +29,15 @@ def check_adb():
     if not !(adb shell id):
         adb kill-server
         adb start-server
-        if not $(adb shell id):
+        if not ![adb shell id]:
             raise ValueError("Device not connected")
 
+def aname(apkfile):
+    package = $(aapt dump badging @(apkfile) | grep "package: name")
+    package = package.split("'")[1]
+
+    logging.info(f"Found package name: {blue(package)}")
+    return package
 
 def aget(pattern):
     check_adb()
@@ -61,7 +68,8 @@ def apath(pattern):
 
 
 def aedit(args):
-    apk-editor @(args)
+    if not ![apk-editor @(args)]:
+        raise ValueError(f"Unable to run apk-editor {args}")
 
 def amerge(src, dest_dir, name=""):
     src = os.path.abspath(src)
@@ -89,20 +97,20 @@ def apull(pattern, all, dry, name, merge, dir, index):
     pulled_files = []
     topull = paths if not single else [paths[index]]
     for path in topull:
-        logging.debug(f"Pulling{' ' if not single else ' single '}{blue(path)}")
-
         classifier = f"{name}."+path.split("/")[-1]
         if single: classifier = classifier.replace("base.", "")
         target = os.path.join(dir, classifier)
 
-        if not dry: !(adb pull @(path) @(target)).rtn # read return code, to force sync execution
+        if not dry:
+            if not ![adb pull @(path) @(target)]:# read return code, to force sync execution
+                raise ValueError(f"Unable to pull {path}")
 
         logging.info(f"Pulled to {blue(target)}")
         pulled_files.append(target)
 
     if len(paths) > 1 and merge and all:
         logging.info("")
-        return [amerge(dir, dir, f"{name}.merged.apk")], paths, package
+        return [amerge(dir, dir, f"merged.{name}.apk")], paths, package
 
     return pulled_files, paths, package
 
@@ -141,11 +149,37 @@ def asha(pattern, apk):
     logging.info(f"Found signature: {blue(signature)}")
     return signature
 
+def asign(apks, keystore, env):
+    out = []
+    for name in apks:
+        path = os.path.abspath(name)
+
+        orig = Path(str(path))
+        result_apk = str(orig.parent / ("signed."+ orig.name))
+
+        cmd = f"sign --ks-pass env:{env} --ks {keystore} --out {result_apk} {path}"
+        logging.debug(f"Running: apksigner {cmd}")
+        if not ![apksigner @(cmd.split())]:
+            raise ValueError(f"Unable to sign: {path}")
+
+        idsig = Path(f"{result_apk}.idsig")
+        if idsig.exists():
+            logging.debug(f"Removing {idsig}")
+            idsig.unlink()
+
+        logging.info(f"Signed: {blue(result_apk)}")
+        out.append(result_apk)
+    return out
+
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-o", "--only-output", action='store_true', default=False)
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # name
+    c = subparsers.add_parser('name', help='Get package name by given apk')
+    c.add_argument('apk_file')
 
     # get
     c = subparsers.add_parser('get', help='Find apks by name.')
@@ -172,10 +206,17 @@ def _create_parser():
     c.add_argument('dest', default="./")
     c.add_argument("-n", '--name', default="")
 
+    # sha
     c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
     group = c.add_mutually_exclusive_group(required=True)
     group.add_argument('-p', "--package", default="")
     group.add_argument("-a", "--apk", default="")
+
+    # sign
+    c = subparsers.add_parser('sign', help='Get fingerprint of the package by name or the apk path')
+    c.add_argument('apks', metavar='N', nargs='*')
+    c.add_argument("-k", '--ks', default="{HOME}/.android/debug.keystore".format(HOME=$HOME))
+    c.add_argument("-e", '--env', default=f"ANDROID_DEBUG_KEYSTORE_PASS")
 
     # edit
     c = subparsers.add_parser('edit', help='Edit an apk by apk-editor',add_help=False)
@@ -184,6 +225,8 @@ def _create_parser():
 
 
 def run(cmd, args, rest):
+    if cmd == "name":
+        return aname(args.apk_file)
     if cmd == "get":
         return aget(args.package_pattern)
     if cmd == "path":
@@ -196,6 +239,8 @@ def run(cmd, args, rest):
         return asha(args.package, args.apk)
     if cmd == "merge":
         return amerge(args.src, args.dest, args.name)
+    if cmd == "sign":
+        return asign(args.apks, args.ks, args.env)
 
 def print_result(result):
     if isinstance(result, list):
