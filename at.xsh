@@ -22,6 +22,7 @@ blue = lambda x: f"{BLUE}{x}{END}"
 bold = lambda x: f"{BOLD}{x}{END}"
 red = lambda x: f"{RED}{x}{END}"
 yellow = lambda x: f"{YELLOW}{x}{END}"
+under = lambda x: f"{UNDERLINE}{x}{END}"
 
 def check_adb():
     if not !(adb shell id):
@@ -29,6 +30,27 @@ def check_adb():
         adb start-server
         if not ![adb shell id]:
             raise ValueError("Device not connected")
+
+def exec(cmd, args, level):
+    args.insert(0, cmd)
+    logging.debug(f"Executing '{under(bold(' '.join(args)))}'")
+    if logging.root.level <= level:
+        return ![@(args)] # uncapture
+    else:
+        return !(@(args)) # capture
+
+def run_silent(runnable):
+    if logging.root.level <= logging.DEBUG: return runnable()
+
+    logging.root.level, prev = logging.FATAL, logging.root.level
+    logging.root.disabled,prev_enabled = True, logging.root.disabled
+    try:
+        return runnable()
+    finally:
+        logging.root.level = prev
+        logging.root.disabled = prev_enabled
+
+
 
 def aname(apkfile):
     package = $(aapt dump badging @(apkfile) | grep "package: name")
@@ -66,7 +88,7 @@ def apath(pattern):
 
 
 def aedit(args):
-    if not ![apk-editor @(args)]:
+    if not exec("apk-editor", args, logging.DEBUG):
         raise ValueError(f"Unable to run apk-editor {args}")
 
 def amerge(src, dest_dir, name=""):
@@ -100,7 +122,7 @@ def apull(pattern, all, dry, name, merge, dir, index):
         target = os.path.join(dir, classifier)
 
         if not dry:
-            if not ![adb pull @(path) @(target)]:# read return code, to force sync execution
+            if not exec("adb", ["pull", path, target], logging.INFO): # read return code, to force sync execution
                 raise ValueError(f"Unable to pull {path}")
 
         logging.info(f"Pulled to {blue(target)}")
@@ -115,7 +137,7 @@ def apull(pattern, all, dry, name, merge, dir, index):
 def asha_apk(apk):
     logging.info(f"Getting signature for: {blue(apk)}")
     apksigner_output = $(apksigner verify --print-certs @(apk)).splitlines()
-    logging.info("\n".join(apksigner_output))
+    logging.debug("\n".join(apksigner_output))
 
     sha256_match = re.search(r"SHA-256 digest:\s*([a-f0-9]+)", "\n".join(apksigner_output))
     sha256 = sha256_match.group(1) if sha256_match else ""
@@ -135,8 +157,8 @@ def asha_package(pattern):
         # sucks lets try to download apk and get the second part
         target, _, _ = apull(pattern, False, False,  "temp", False, "/tmp", -1) # get last that is smaller
         logging.info("")
-        signature = asha_apk(target[0])
-        rm @(target)
+        signature =  asha_apk(target[0])
+        rm @(target[0])
 
     return signature
 
@@ -147,12 +169,14 @@ def asha(pattern, apk):
     logging.info(f"Found signature: {blue(signature)}")
     return signature
 
-def asign(apks, keystore, env):
+def asign(apks, keystore, env, dir=""):
     out = []
     for name in apks:
         path = Path(name).resolve()
 
-        result_apk = str(path.parent / ("signed."+ path.name))
+        dir = path.parent if not dir else Path(dir).resolve()
+        if not dir.exists(): dir.mkdir()
+        result_apk = str(dir / ("signed."+ path.name))
 
         cmd = f"sign --ks-pass env:{env} --ks {keystore} --out {result_apk} {path}"
         logging.debug(f"Running: apksigner {cmd}")
@@ -246,6 +270,60 @@ def abl(src, verbose, force, keystore, env, assemble, align, sign, clean):
 
     return target_signed
 
+def arm(pattern):
+    res = aget(pattern)
+    if len(res) > 1: raise ValueError(f"Returned multiple packages, expected one")
+    res = res[0]
+    logging.info(f"Removing: {blue(res)}")
+    adb uninstall @(res)
+    return res
+
+
+def ainst(src, flags, force):
+    todo=""
+    cmd = [*flags]
+    src = list(map(lambda x: Path(x).resolve(), src))
+    if len(src) == 1 and src[0].is_dir():
+        logging.info(f"Looking into {blue(src[0])}")
+        src = list(src[0].rglob("*.apk"))
+
+    if len(src) > 1:
+        highlighted = '\n'.join(map(lambda x: f"- {blue(x)}", src))
+        todo = f"Installing multiple apks: \n{highlighted}\n"
+        cmd.extend(["install-multiple", *[str(a) for a in src]])
+    else:
+        todo = f"Installing apk: {blue(src[0])}"
+        cmd.extend(["install", str(src[0])])
+
+    package = aname(str(src[0]))
+
+    try:
+        logging.info(f"Checking matching signatures")
+        target, given = run_silent(lambda: (asha_package(package), asha_apk(str(src[0]))))
+        logging.info(f"Found: {blue(given)}")
+    except ValueError:
+        logging.info("Package is not yet installed")
+        target = given = ""
+
+    if given != target:
+        logging.info(f"Target:{blue(target)}")
+        logging.warning(yellow("Signatures don't match"))
+        if not force:
+            raise ValueError("Use -f to force replacement of the target package. Abort.")
+        logging.info(f"Uninstalling previous {package}")
+        rm = [*flags, "uninstall", package]
+        logging.debug(f"Running: adb {' '.join(rm)}")
+        adb @(rm)
+
+
+    logging.info(todo)
+    out = list(map(str, src))
+    logging.debug(f"Running: adb {' '.join(cmd)}")
+    if not ![adb @(cmd)]:
+        raise ValueError(f"Unable to install {out}")
+
+    return out
+
 def _create_parser():
     parser = argparse.ArgumentParser(description="Android reverse engineering tool")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
@@ -301,6 +379,16 @@ def _create_parser():
     c.add_argument("-c", "--clean", action='store_true', default=False)
     c.add_argument("-f", "--force", action='store_true', default=False)
 
+    # install
+    c = subparsers.add_parser('in', help='Install one apk or several apks')
+    c.add_argument('src', metavar='N', nargs="*")
+    c.add_argument("-f", "--force", action='store_true', default=False)
+
+
+    # remove
+    c = subparsers.add_parser('rm', help='Remove an app by package pattern.')
+    c.add_argument('package_pattern')
+
     # sha
     c = subparsers.add_parser('sha', help='Get fingerprint of the package by name or the apk path')
     group = c.add_mutually_exclusive_group(required=True)
@@ -310,6 +398,7 @@ def _create_parser():
     # sign
     c = subparsers.add_parser('sign', help='Sign an apk using keystore')
     c.add_argument('apks', metavar='N', nargs='*')
+    c.add_argument('-d', "--dir", default="")
     c.add_argument("-k", '--ks', default="{HOME}/.android/debug.keystore".format(HOME=$HOME))
     c.add_argument("-e", '--env', default=f"ANDROID_DEBUG_KEYSTORE_PASS")
 
@@ -341,8 +430,12 @@ def run(cmd, args, rest):
         return adis(args.apks, args.force)
     if cmd == "bl":
         return abl(args.src, args.verbose, args.force, args.ks, args.env, args.ass, args.zipalign, args.sign, args.clean)
+    if cmd == "rm":
+        return arm(args.package_pattern)
+    if cmd == "in":
+        return ainst(args.src, rest, args.force)
     if cmd == "sign":
-        return asign(args.apks, args.ks, args.env)
+        return asign(args.apks, args.ks, args.env, args.dir)
 
 def print_result(result):
     if isinstance(result, list):
